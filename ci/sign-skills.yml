@@ -1,0 +1,88 @@
+# .github/workflows/sign-skills.yml  (v5.0)
+#
+# Keyless (Sigstore) signing of the COMPLETE agent skill set in CI, plus a signed
+# whole-artifact inventory. Coverage comes from ONE source of truth,
+# artifact-spec.json, via the shipped tools/ scripts; the workflow does not
+# re-inline the file list or the policy globs.
+#
+# IMPORTANT, read before presenting as a working example:
+#   This workflow has NOT been validated end to end. Before relying on it:
+#     1. Run it once on a throwaway branch/repo.
+#     2. Confirm the `production-signing` environment required a human approval.
+#     3. Confirm branch protection required PR review to reach `main`.
+#     4. Verify the resulting .bundle files AND .nono-inventory on a SEPARATE
+#        consumer machine (nono trust verify --all; python3 verify_artifact.py).
+#
+# Optional files: artifact-spec.json lists AGENTS.md as an optional root file.
+# tools/spec_includes.py emits an include for it ONLY when it exists, because a
+# missing literal include can block startup on macOS under deny. The policy and
+# the signed set therefore track the files that are actually present.
+
+name: sign-skills
+on:
+  push:
+    branches: [main]
+    paths:
+      - "CLAUDE.md"
+      - "AGENTS.md"
+      - "artifact-spec.json"
+      - ".claude/skills/**"
+      - ".github/workflows/sign-skills.yml"
+      - "ci/trust-policy.keyless.json"
+      - "tools/**"
+      - "verify_artifact.py"
+
+permissions:
+  contents: write      # to commit the .bundle sidecars + inventory back
+  id-token: write      # REQUIRED for keyless signing (ephemeral OIDC identity)
+
+jobs:
+  sign:
+    runs-on: ubuntu-latest
+    environment: production-signing   # requires a configured human approval
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683   # v4.2.2, pinned
+
+      - name: Install nono (pinned version)
+        run: cargo install nono-cli --version 0.80.0 --locked
+
+      - name: Validate the policy includes match the single source of truth
+        shell: bash
+        run: |
+          set -euo pipefail
+          # The committed policy's includes MUST equal what the spec generates, so
+          # discovery and verification cannot drift. Regenerate the policy if this
+          # fails: tools/spec_includes.py is authoritative.
+          if ! diff <(python3 tools/spec_includes.py | sort) \
+                    <(python3 -c 'import json;print("\n".join(json.load(open("ci/trust-policy.keyless.json"))["includes"]))' | sort); then
+            echo "::error::ci/trust-policy.keyless.json includes drifted from artifact-spec.json; regenerate from tools/spec_includes.py"
+            exit 1
+          fi
+
+      - name: Build the whole-artifact inventory (single source of truth)
+        run: python3 tools/build-inventory.py
+
+      - name: Sign the covered files AND the inventory (keyless)
+        shell: bash
+        run: |
+          set -euo pipefail
+          while IFS= read -r f; do
+            [ -n "$f" ] || continue
+            echo "signing $f"
+            nono trust sign "$f" --keyless
+          done < <(python3 tools/covered_files.py)
+
+      - name: Commit signature bundles + inventory
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -- '*.bundle' .nono-inventory
+          # Distinguish "nothing changed" from a real commit failure: check the
+          # staged diff first, and only then commit. A failing commit is an ERROR.
+          if git diff --cached --quiet; then
+            echo "nothing to sign (no bundle/inventory changes)"; exit 0
+          fi
+          git commit -m "ci: sign covered skill files + inventory (keyless)"
+          git push

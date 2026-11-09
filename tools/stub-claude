@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+# Stub Claude Code, for rehearsing the real-agent plumbing WITHOUT a model or key.
+# It mimics only what the demo needs: a real agent that loads the project's
+# CLAUDE.md and skills and runs the repo-insights skill. Point CLAUDE_BIN at the
+# real `claude` for a live run; this stub is selected with NONO_DEMO_STUB=1.
+echo "claude (stub): loaded CLAUDE.md and .claude/skills (found: repo-insights)"
+echo "claude (stub): the repo-insights skill says to run its helper; doing so:"
+python3 .claude/skills/repo-insights/scripts/insights.py
+rc=$?
+echo "claude (stub): done (rc=$rc); stayed within the sandbox."
+exit $rc

@@ -1,0 +1,32 @@
+{
+  "_comment": "Production trust policy that trusts a CI IDENTITY (keyless), not a key. The `includes` are GENERATED from artifact-spec.json by tools/spec_includes.py and validated in CI, so discovery, signing and the policy cannot drift. Optional files (e.g. AGENTS.md) appear here only when present, matching nono semantics. The signed .nono-inventory is the authority on which files must exist; verify_artifact.py enforces that. Replace my-org/payments-api with your repo, then sign this file: `nono trust sign-policy`.",
+  "predicate": "https://nono.sh/attestation/trust-policy/v1",
+  "includes": [
+    "CLAUDE.md",
+    "artifact-spec.json",
+    ".nono-inventory",
+    ".claude/skills/**/*.md",
+    ".claude/skills/**/*.py",
+    ".claude/skills/**/*.sh",
+    ".claude/skills/**/*.js",
+    ".claude/skills/**/*.json",
+    ".claude/skills/**/*.yaml",
+    ".claude/skills/**/*.yml",
+    ".claude/skills/**/*.txt",
+    ".claude/skills/**/*.toml"
+  ],
+  "publishers": [
+    {
+      "name": "payments-api CI",
+      "issuer": "https://token.actions.githubusercontent.com",
+      "repository": "my-org/payments-api",
+      "workflow": ".github/workflows/sign-skills.yml",
+      "ref_pattern": "refs/heads/main"
+    }
+  ],
+  "blocklist": {
+    "digests": [],
+    "publishers": []
+  },
+  "enforcement": "deny"
+}

@@ -1,0 +1,7 @@
+{
+  "comment": "Single source of truth for the artifact's covered contents. It is itself signed and inventoried, so it cannot be quietly widened. The inventory hashes every file under root_files (those that exist) and skill_dirs (recursively, any type). nono per-file signing covers root_files, the inventory, and skill_dirs/**/*.<skill_extensions>. build-inventory.py, verify_artifact.py, lib/common.sh and ci/sign-skills.yml all derive from this file.",
+  "root_files": ["CLAUDE.md", "AGENTS.md", "artifact-spec.json"],
+  "skill_dirs": [".claude/skills"],
+  "skill_extensions": ["md", "py", "sh", "js", "json", "yaml", "yml", "txt", "toml"],
+  "inventory_file": ".nono-inventory"
+}
